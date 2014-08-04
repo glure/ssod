@@ -54,8 +54,8 @@
 (defun shoot ()
   "Spawn a bullet from player position."
   (vector-push (make-bullet :position (copy-tree (entity-position player))
-			    :velocity '(0 -200)
-			    :acceleration '(0 0)
+			    :velocity (list 0 -1200)
+			    :acceleration (list 0 0)
 			    :color '(sdl:color :r 255 :g 0 :b 0))
 	       bullets))
 
