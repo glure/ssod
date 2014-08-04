@@ -28,6 +28,11 @@
                                                                    *game-root-dir*))
                                                   :alpha ,alpha)))
 
+(defmacro for-all-bullets (&rest body)
+  `(loop for i from 0 to (1- (length bullets))
+      do (let ((bullet (elt bullets i)))
+           (progn ,@body))))
+
 (defun key-down (key)
   (if (sdl:key-down-p key)
       T
@@ -38,7 +43,6 @@
 			 (round (- (elt (entity-position player) 0) 24))
 			 (round (- (elt (entity-position player) 1) 24))))
 
-
 (defun draw-bullets ()
   (for-all-bullets (symbol-macrolet ((x (elt (bullet-position bullet) 0))
 				     (y (elt (bullet-position bullet) 1)))
@@ -47,18 +51,13 @@
 				     12 12
 				     :color (eval (bullet-color bullet))))))
 
-
 (defun shoot ()
+  "Spawn a bullet from player position."
   (vector-push (make-bullet :position (copy-tree (entity-position player))
-			    :velocity '(0 200)
-			    :acceleration '(0 -15000)
+			    :velocity '(0 -200)
+			    :acceleration '(0 0)
 			    :color '(sdl:color :r 255 :g 0 :b 0))
 	       bullets))
-
-(defmacro for-all-bullets (&rest body)
-  `(loop for i from 0 to (1- (length bullets))
-      do (let ((bullet (elt bullets i)))
-           (progn ,@body))))
 
 (defun mark-dead-bullets ()
   "Mark each bullet dead if its position is outside screen area."
@@ -71,6 +70,7 @@
 			 (setf (bullet-dead bullet) 1)))))
 
 (defun remove-dead-bullets ()
+  "Remove dead bullets from bullets vector."
   (let ((temp-bullets bullets))
     (loop for i from (1- (length bullets)) downto 0
        do (if (eq (bullet-dead (elt bullets i)) 1)
@@ -79,8 +79,19 @@
 					    :count 1))))
     temp-bullets))
 
-
-
+(defun process-bullet-physics ()
+  (for-all-bullets (multiple-value-bind (x_v y_v x y) (physics bullet)
+		     (setf (elt (bullet-position bullet) 0) x)
+		     (setf (elt (bullet-position bullet) 1) y)
+		     (setf (elt (bullet-velocity bullet) 0) x_v)
+		     (setf (elt (bullet-velocity bullet) 1) y_v))))
+      
+(defun process-player-physics ()
+  (multiple-value-bind (x_v y_v x y) (physics player)
+    (setf (elt (entity-position player) 0) (round x))
+    (setf (elt (entity-position player) 1) (round y))
+    (setf (elt (entity-velocity player) 0) x_v)
+    (setf (elt (entity-velocity player) 1) y_v)))
 
 (defun main ()
   (load (merge-pathnames "physics.lisp" *game-root-dir*))
@@ -93,8 +104,8 @@
       (:key-down-event (:key key)
        (case key
          (:sdl-key-escape (sdl:push-quit-event))
-	 (:sdl-key-up (progn (setf (elt (entity-velocity player) 1)
-			    -100) (format t "~D~%" (elt (entity-velocity player) 0))))
+	 (:sdl-key-up (setf (elt (entity-velocity player) 1)
+			    -100))
 	 (:sdl-key-down (setf (elt (entity-velocity player) 1)
 			      100))
 	 (:sdl-key-left (setf (elt (entity-velocity player) 0)
@@ -105,11 +116,12 @@
       (:idle ()
       (sdl:clear-display sdl:*black*)
       
-      (physics player)
-      (draw-player)
+        (process-player-physics)
+	(draw-player)
       
-      (for-all-bullets (physics bullet))
-      (mark-dead-bullets)
-      (remove-dead-bullets)
-      (draw-bullets)
+	(process-bullet-physics)
+	(mark-dead-bullets)
+	(remove-dead-bullets)
+	(draw-bullets)
+
       (sdl:update-display)))))
